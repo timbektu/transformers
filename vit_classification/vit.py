@@ -11,6 +11,7 @@ from transformer import (
     CrossAttentionBlock,
     FeedForwardBlock
 )
+import pdb
 
 class EncoderLayer(nn.Module):
     def __init__(self, d_model, num_heads, d_ff=2048, dropout=0.1):
@@ -54,10 +55,10 @@ class ViT(nn.Module):
         self.num_classes = num_classes
         self.device = device
 
-        self.patch_embedding = None # TODO (Linear Layer that takes as input a patch and outputs a d_model dimensional vector)
-        self.positional_encoding = None # TODO (use the positional encoding from the transformer captioning solution)
-        self.fc = None # TODO (takes as input the embedding corresponding to the [CLS] token and outputs the logits for each class)
-        self.cls_token = None # TODO (learnable [CLS] token embedding)
+        self.patch_embedding = nn.Linear(self.patch_dim*self.patch_dim*3, self.d_model) # TODO (Linear Layer that takes as input a patch and outputs a d_model dimensional vector)
+        self.positional_encoding = PositionalEncoding(self.d_model) # TODO (use the positional encoding from the transformer captioning solution)
+        self.fc = nn.Linear(self.d_model, self.num_classes) # TODO (takes as input the embedding corresponding to the [CLS] token and outputs the logits for each class)
+        self.cls_token = nn.Parameter(torch.randn(1,1,d_model)) # TODO (learnable [CLS] token embedding)
 
         self.layers = nn.ModuleList([EncoderLayer(d_model, num_heads, d_ff) for _ in range(num_layers)])
 
@@ -76,8 +77,13 @@ class ViT(nn.Module):
 
         # TODO - Break images into a grid of patches
         # Feel free to use pytorch built-in functions to do this
-        
-        return images
+
+        patches = images.unfold(2, self.patch_dim, self.patch_dim).unfold(3, self.patch_dim, self.patch_dim)
+        # patches = patches.contiguous().view(images.size(0), -1, self.patch_dim * self.patch_dim* 3)
+        patches = patches.permute(0, 2, 3, 1, 4, 5)
+        patches = patches.reshape(images.shape[0], self.num_patches, -1)
+
+        return patches
 
     def forward(self, images):
         """
@@ -87,19 +93,21 @@ class ViT(nn.Module):
             Returns:
                 - logits: a FloatTensor of shape (N, C) giving the logits for each class
         """
-        
+
         patches = self.patchify(images)
         patches_embedded = self.patch_embedding(patches)
-        
-        output = None # TODO (append a CLS token to the beginning of the sequence of patch embeddings)
 
-        output = self.positional_encoding(patches_embedded)
-        mask = torch.ones((self.num_patches, self.num_patches), device=self.device)
+        cls_token = self.cls_token.expand(patches.shape[0],-1,-1)
+        
+        output = torch.cat([cls_token, patches_embedded], dim=1) # TODO (append a CLS token to the beginning of the sequence of patch embeddings)
+        output = self.positional_encoding(output)
+        
+        mask = torch.ones((self.num_patches+1, self.num_patches+1), device=self.device)
 
         for layer in self.layers:
             output = layer(output, mask)
 
-        output = None # TODO (take the embedding corresponding to the [CLS] token and feed it through a linear layer to obtain the logits for each class)
+        output = self.fc(output[:,0,:]) # TODO (take the embedding corresponding to the [CLS] token and feed it through a linear layer to obtain the logits for each class)
 
         return output
 

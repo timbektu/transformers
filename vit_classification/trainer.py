@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from vit import ViT
+import pdb
 
 class Trainer:
     def __init__(self, model, train_dataloader, test_dataloader, learning_rate = 0.001, batch_size = 100, 
@@ -49,9 +50,7 @@ class Trainer:
 
         
         # TODO - Compute cross entropy loss between predictions and labels. 
-        loss = None
-        
-
+        loss = torch.nn.functional.cross_entropy(predictions, labels, reduction='mean')
         return loss
 
     def train(self):
@@ -63,6 +62,8 @@ class Trainer:
                 images = images.to(self.device)
                 labels = labels.to(self.device)
                 logits = self.model(images)
+
+                # pdb.set_trace() #TODO: check the dims of logits?
 
                 loss = self.loss(logits, labels)
                 

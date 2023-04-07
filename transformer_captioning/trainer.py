@@ -2,6 +2,7 @@ import numpy as np
 from utils import  decode_captions
 
 import torch
+import pdb
 
 
 class Trainer(object):
@@ -24,12 +25,23 @@ class Trainer(object):
         #TODO - Compute cross entropy loss between predictions and labels. 
         #Make sure to compute this loss only for indices where label is not the null token.
         #The loss should be averaged over batch and sequence dimensions. 
+        # pdb.set_trace()
+        N,S = predictions.shape[0],predictions.shape[1]
+        preds_flat = predictions.view(N*S, -1)
+        labels_flat = labels.flatten()
+
+        loss = torch.nn.functional.cross_entropy(input = preds_flat, 
+                                                 target = labels_flat, 
+                                                 reduction='mean', 
+                                                 ignore_index=self.model._null)
+
         return loss
     
     def val(self):
         """
         Run validation to compute loss and BLEU-4 score.
         """
+        print("validation")
         self.model.eval()
         val_loss = 0
         num_batches = 0
@@ -53,6 +65,7 @@ class Trainer(object):
             num_batches = 0
             for batch in self.train_dataloader:
                 features, captions = batch[0].to(self.device), batch[1].to(self.device)
+                # pdb.set_trace()
                 logits = self.model(features, captions[:, :-1])
 
                 loss = self.loss(logits, captions[:, 1:])
